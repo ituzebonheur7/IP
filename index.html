@@ -1,0 +1,596 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>IP Inspector</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --bg:       #0b0d12;
+  --surf:     #13161d;
+  --surf2:    #1a1e28;
+  --border:   rgba(255,255,255,0.06);
+  --border2:  rgba(255,255,255,0.12);
+  --text:     #dde1ec;
+  --muted:    #6b7385;
+  --accent:   #4f8cff;
+  --green:    #2ecc8a;
+  --amber:    #f5a623;
+  --red:      #e05555;
+  --mono:     'JetBrains Mono','Fira Mono','Courier New',monospace;
+  --sans:     'Inter',system-ui,sans-serif;
+  --r:        12px;
+  --rs:       7px;
+}
+
+@media (prefers-color-scheme: light) {
+  :root {
+    --bg:      #eef0f6;
+    --surf:    #ffffff;
+    --surf2:   #f4f6fb;
+    --border:  rgba(0,0,0,0.07);
+    --border2: rgba(0,0,0,0.13);
+    --text:    #1b1e2b;
+    --muted:   #6b7280;
+    --accent:  #1a6fff;
+    --green:   #0c9e5a;
+    --amber:   #b87400;
+    --red:     #c23030;
+  }
+}
+
+body {
+  font-family: var(--sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  padding: 2.5rem 1rem 5rem;
+}
+
+/* ─── HEADER ─── */
+header {
+  max-width: 900px;
+  margin: 0 auto 2.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.brand { display: flex; align-items: center; gap: 11px; }
+
+.brand-icon {
+  width: 40px; height: 40px;
+  background: var(--accent);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+}
+.brand-icon svg { width: 22px; height: 22px; fill: none; stroke: #fff; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+
+.brand-name { font-size: 1.2rem; font-weight: 600; letter-spacing: -0.01em; }
+.brand-sub  { font-size: 0.8rem; color: var(--muted); margin-top: 1px; }
+
+.refresh-btn {
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 18px;
+  background: transparent;
+  border: 1px solid var(--border2);
+  border-radius: 8px;
+  color: var(--text);
+  font-family: var(--sans);
+  font-size: 0.85rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: background 0.15s, border-color 0.15s;
+}
+.refresh-btn:hover   { background: var(--surf); border-color: var(--accent); color: var(--accent); }
+.refresh-btn:active  { transform: scale(0.97); }
+.refresh-btn svg     { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 2.2; stroke-linecap: round; stroke-linejoin: round; }
+.refresh-btn.loading svg { animation: spin 0.65s linear infinite; }
+@keyframes spin { to { transform: rotate(360deg); } }
+
+/* ─── LAYOUT ─── */
+.wrap  { max-width: 900px; margin: 0 auto; display: flex; flex-direction: column; gap: 1.25rem; }
+
+.error-bar {
+  background: rgba(224,85,85,0.1);
+  border: 1px solid rgba(224,85,85,0.25);
+  border-radius: var(--rs);
+  padding: 0.9rem 1.2rem;
+  color: var(--red);
+  font-size: 0.875rem;
+  display: none;
+}
+
+/* ─── HERO ─── */
+.hero {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  padding: 2rem 2rem 1.75rem;
+  display: grid;
+  grid-template-columns: auto 1fr auto;
+  gap: 2rem;
+  align-items: start;
+}
+@media (max-width: 600px) {
+  .hero { grid-template-columns: 1fr; gap: 1.25rem; padding: 1.25rem; }
+}
+
+.hero-ip-label {
+  font-size: 0.68rem;
+  font-weight: 700;
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--muted);
+  margin-bottom: 8px;
+}
+
+.hero-ip-val {
+  font-family: var(--mono);
+  font-size: 2rem;
+  font-weight: 700;
+  color: var(--accent);
+  letter-spacing: -0.02em;
+  word-break: break-all;
+  line-height: 1.1;
+  min-height: 38px;
+}
+
+.ip-badge {
+  display: inline-block;
+  margin-top: 10px;
+  padding: 3px 11px;
+  border-radius: 20px;
+  font-size: 0.7rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  background: rgba(79,140,255,0.12);
+  color: var(--accent);
+}
+
+.hero-loc-name {
+  font-size: 1.45rem;
+  font-weight: 600;
+  line-height: 1.25;
+  min-height: 30px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.hero-loc-sub  { font-size: 0.88rem; color: var(--muted); margin-top: 5px; min-height: 18px; }
+.hero-loc-coord { font-family: var(--mono); font-size: 0.76rem; color: var(--muted); margin-top: 8px; }
+
+.hero-status-label {
+  font-size: 0.68rem; font-weight: 700;
+  letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); margin-bottom: 8px;
+}
+
+.status-pill {
+  display: flex; align-items: center; gap: 7px;
+  font-size: 0.85rem; font-weight: 600;
+  color: var(--green);
+}
+
+.dot {
+  width: 8px; height: 8px;
+  border-radius: 50%;
+  background: var(--green);
+  box-shadow: 0 0 0 3px rgba(46,204,138,0.18);
+  flex-shrink: 0;
+}
+
+/* ─── GRID ─── */
+.grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+  gap: 1.25rem;
+}
+
+.card {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.card-head {
+  padding: 0.85rem 1.2rem;
+  border-bottom: 1px solid var(--border);
+  display: flex; align-items: center; gap: 9px;
+}
+
+.card-head svg {
+  width: 16px; height: 16px;
+  fill: none; stroke: var(--accent);
+  stroke-width: 2; stroke-linecap: round; stroke-linejoin: round;
+  flex-shrink: 0;
+}
+
+.card-title {
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.09em;
+  text-transform: uppercase;
+  color: var(--muted);
+}
+
+.rows { padding: 0.5rem 0; }
+
+.row {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.42rem 1.2rem;
+  transition: background 0.1s;
+}
+.row:hover { background: var(--surf2); }
+
+.rk { font-size: 0.8rem; color: var(--muted); flex-shrink: 0; white-space: nowrap; }
+.rv { font-size: 0.84rem; font-weight: 500; text-align: right; word-break: break-all; color: var(--text); }
+.rv.mono { font-family: var(--mono); font-size: 0.78rem; }
+
+/* skeleton */
+.skel {
+  display: inline-block;
+  border-radius: 5px;
+  background: var(--border2);
+  animation: pulse 1.4s ease-in-out infinite;
+}
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.35} }
+
+/* EU badge */
+.eu { display: inline-flex; align-items: center; gap: 5px; padding: 3px 10px; border-radius: 20px; font-size: 0.73rem; font-weight: 700; }
+.eu.yes { background: rgba(46,204,138,0.1); color: var(--green); }
+.eu.no  { background: var(--surf2); color: var(--muted); }
+
+/* ─── JSON PANEL ─── */
+.json-panel {
+  background: var(--surf);
+  border: 1px solid var(--border);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+
+.json-toggle {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 0.9rem 1.2rem;
+  border-bottom: 1px solid transparent;
+  cursor: pointer;
+  user-select: none;
+  transition: border-color 0.2s;
+}
+.json-toggle.open { border-color: var(--border); }
+.json-toggle-left { display: flex; align-items: center; gap: 9px; }
+.json-toggle svg  { width: 16px; height: 16px; fill: none; stroke: var(--accent); stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+.json-toggle-title { font-size: 0.72rem; font-weight: 700; letter-spacing: 0.09em; text-transform: uppercase; color: var(--muted); }
+.chevron { transition: transform 0.2s; stroke: var(--muted) !important; }
+.chevron.open { transform: rotate(180deg); }
+
+.json-body { max-height: 0; overflow: hidden; transition: max-height 0.3s ease; }
+.json-body.open { max-height: 700px; overflow-y: auto; }
+
+pre {
+  padding: 1.2rem 1.4rem;
+  font-family: var(--mono);
+  font-size: 0.78rem;
+  line-height: 1.75;
+  color: var(--muted);
+  overflow-x: auto;
+}
+
+.jk  { color: var(--accent); }
+.js  { color: var(--green); }
+.jn  { color: var(--amber); }
+.jb  { color: var(--red); }
+
+/* ─── FOOTER ─── */
+footer {
+  max-width: 900px;
+  margin: 2.5rem auto 0;
+  text-align: center;
+  font-size: 0.73rem;
+  color: var(--muted);
+  line-height: 1.7;
+}
+footer strong { color: var(--text); font-weight: 600; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="brand-icon">
+      <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M12 3a6 6 0 0 1 0 18M12 3a6 6 0 0 0 0 18M3 12h18"/></svg>
+    </div>
+    <div>
+      <div class="brand-name">IP Inspector</div>
+      <div class="brand-sub">All data resolved by this server — zero third-party APIs</div>
+    </div>
+  </div>
+
+  <button class="refresh-btn" id="refreshBtn" onclick="load()">
+    <svg viewBox="0 0 24 24" id="refreshIcon"><polyline points="23 4 23 10 17 10"/><path d="M20.49 15a9 9 0 1 1-2.12-9.36L23 10"/></svg>
+    Refresh
+  </button>
+</header>
+
+<div class="wrap">
+  <div class="error-bar" id="errBar"></div>
+
+  <!-- Hero card -->
+  <div class="hero">
+    <div>
+      <div class="hero-ip-label">Your IP address</div>
+      <div class="hero-ip-val" id="hIp"><span class="skel" style="width:200px;height:32px;display:block;"></span></div>
+      <div id="hVer"></div>
+    </div>
+    <div>
+      <div class="hero-ip-label">Location</div>
+      <div class="hero-loc-name" id="hLoc"><span class="skel" style="width:180px;height:24px;"></span></div>
+      <div class="hero-loc-sub"  id="hSub"><span class="skel" style="width:130px;height:14px;display:inline-block;margin-top:4px;"></span></div>
+      <div class="hero-loc-coord" id="hCoord"></div>
+    </div>
+    <div>
+      <div class="hero-status-label">Status</div>
+      <div class="status-pill"><span class="dot"></span>Online</div>
+    </div>
+  </div>
+
+  <!-- Cards grid -->
+  <div class="grid">
+
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 24 24"><rect x="2" y="7" width="6" height="4" rx="1"/><rect x="16" y="7" width="6" height="4" rx="1"/><rect x="9" y="14" width="6" height="4" rx="1"/><path d="M5 11v2h14v-2M12 13v1"/></svg>
+        <span class="card-title">Network</span>
+      </div>
+      <div class="rows" id="cNetwork">
+        <div class="row"><span class="rk">ASN</span><span class="rv mono" data-key="asn">—</span></div>
+        <div class="row"><span class="rk">Organization</span><span class="rv" data-key="org">—</span></div>
+        <div class="row"><span class="rk">Network CIDR</span><span class="rv mono" data-key="network">—</span></div>
+        <div class="row"><span class="rk">Hostname</span><span class="rv mono" data-key="hostname">—</span></div>
+        <div class="row"><span class="rk">IP version</span><span class="rv mono" data-key="version">—</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 24 24"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+        <span class="card-title">Location</span>
+      </div>
+      <div class="rows" id="cLocation">
+        <div class="row"><span class="rk">City</span><span class="rv" data-key="city">—</span></div>
+        <div class="row"><span class="rk">Region</span><span class="rv" data-key="region">—</span></div>
+        <div class="row"><span class="rk">Region code</span><span class="rv mono" data-key="region_code">—</span></div>
+        <div class="row"><span class="rk">Postal code</span><span class="rv mono" data-key="postal">—</span></div>
+        <div class="row"><span class="rk">Latitude</span><span class="rv mono" data-key="latitude">—</span></div>
+        <div class="row"><span class="rk">Longitude</span><span class="rv mono" data-key="longitude">—</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 24 24"><path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"/><line x1="4" y1="22" x2="4" y2="15"/></svg>
+        <span class="card-title">Country</span>
+      </div>
+      <div class="rows" id="cCountry">
+        <div class="row"><span class="rk">Country</span><span class="rv" data-key="country_name">—</span></div>
+        <div class="row"><span class="rk">ISO A2</span><span class="rv mono" data-key="country_code">—</span></div>
+        <div class="row"><span class="rk">ISO A3</span><span class="rv mono" data-key="country_code_iso3">—</span></div>
+        <div class="row"><span class="rk">Capital</span><span class="rv" data-key="country_capital">—</span></div>
+        <div class="row"><span class="rk">TLD</span><span class="rv mono" data-key="country_tld">—</span></div>
+        <div class="row"><span class="rk">Continent</span><span class="rv mono" data-key="continent_code">—</span></div>
+        <div class="row"><span class="rk">In EU</span><span class="rv" id="euBadge">—</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><path d="M14.83 14.83A4 4 0 1 1 9.17 9.17"/><line x1="12" y1="8" x2="12" y2="7"/><line x1="12" y1="17" x2="12" y2="16"/></svg>
+        <span class="card-title">Currency &amp; Language</span>
+      </div>
+      <div class="rows">
+        <div class="row"><span class="rk">Currency code</span><span class="rv mono" data-key="currency">—</span></div>
+        <div class="row"><span class="rk">Currency name</span><span class="rv" data-key="currency_name">—</span></div>
+        <div class="row"><span class="rk">Calling code</span><span class="rv mono" data-key="country_calling_code">—</span></div>
+        <div class="row"><span class="rk">Languages</span><span class="rv" data-key="languages">—</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 16 14"/></svg>
+        <span class="card-title">Time &amp; Timezone</span>
+      </div>
+      <div class="rows">
+        <div class="row"><span class="rk">Timezone</span><span class="rv" data-key="timezone">—</span></div>
+        <div class="row"><span class="rk">UTC offset</span><span class="rv mono" data-key="utc_offset">—</span></div>
+        <div class="row"><span class="rk">Local time</span><span class="rv mono" id="localTime">—</span></div>
+        <div class="row"><span class="rk">Local date</span><span class="rv" id="localDate">—</span></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="card-head">
+        <svg viewBox="0 0 24 24"><path d="M3 3v18h18"/><polyline points="18 9 12 15 9 12 6 15"/></svg>
+        <span class="card-title">Country Stats</span>
+      </div>
+      <div class="rows">
+        <div class="row"><span class="rk">Area</span><span class="rv" id="areaVal">—</span></div>
+        <div class="row"><span class="rk">Population</span><span class="rv" id="popVal">—</span></div>
+      </div>
+    </div>
+
+  </div><!-- /grid -->
+
+  <!-- JSON panel -->
+  <div class="json-panel">
+    <div class="json-toggle" id="jToggle" onclick="toggleJson()">
+      <div class="json-toggle-left">
+        <svg viewBox="0 0 24 24"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+        <span class="json-toggle-title">Raw JSON payload</span>
+      </div>
+      <svg class="chevron" viewBox="0 0 24 24" style="width:16px;height:16px;fill:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;" id="chev"><polyline points="6 9 12 15 18 9"/></svg>
+    </div>
+    <div class="json-body" id="jBody">
+      <pre id="jPre">Loading…</pre>
+    </div>
+  </div>
+
+</div><!-- /wrap -->
+
+<footer>
+  <strong>Zero external HTTP APIs.</strong> All data resolved server-side using:<br>
+  <strong>GeoLite2-City.mmdb</strong> (bundled local DB) · <strong>Team Cymru DNS</strong> (ASN/network via DNS TXT) ·
+  <strong>POSIX socket</strong> (reverse DNS) · <strong>pycountry</strong> (ISO 3166) · <strong>built-in country dataset</strong> (capitals, currencies, stats)
+</footer>
+
+<script>
+let tz = null;
+let clockId = null;
+
+function $(id){ return document.getElementById(id); }
+
+function fill(key, val){
+  document.querySelectorAll(`[data-key="${key}"]`).forEach(el => {
+    el.textContent = (val !== null && val !== undefined && val !== "") ? val : "—";
+  });
+}
+
+function flag(code){
+  if(!code || code.length !== 2) return "";
+  const o = 0x1F1E6 - 65;
+  return String.fromCodePoint(code.charCodeAt(0)+o) + String.fromCodePoint(code.charCodeAt(1)+o);
+}
+
+function fmt(n){
+  if(n === null || n === undefined) return "—";
+  return Number(n).toLocaleString();
+}
+
+function tick(){
+  if(!tz) return;
+  try {
+    const now = new Date();
+    const opts = {timeZone: tz};
+    $("localTime").textContent = now.toLocaleTimeString("en-GB", {...opts, hour12:false});
+    $("localDate").textContent = now.toLocaleDateString("en-GB", {...opts, weekday:"short", day:"numeric", month:"short", year:"numeric"});
+  } catch(e){}
+}
+
+function hlJson(obj){
+  return JSON.stringify(obj, null, 2)
+    .replace(/("[\w_]+")\s*:/g, '<span class="jk">$1</span>:')
+    .replace(/:\s*("(?:[^"\\]|\\.)*")/g, ': <span class="js">$1</span>')
+    .replace(/:\s*(\-?\d+\.?\d*)/g, ': <span class="jn">$1</span>')
+    .replace(/:\s*(true|false|null)/g, ': <span class="jb">$1</span>');
+}
+
+function toggleJson(){
+  const body  = $("jBody");
+  const tog   = $("jToggle");
+  const chev  = $("chev");
+  body.classList.toggle("open");
+  tog.classList.toggle("open");
+  chev.classList.toggle("open");
+}
+
+async function load(){
+  const btn  = $("refreshBtn");
+  const icon = $("refreshIcon");
+  btn.disabled = true;
+  btn.classList.add("loading");
+  $("errBar").style.display = "none";
+
+  // reset hero skeletons
+  $("hIp").innerHTML = '<span class="skel" style="width:200px;height:32px;display:block;"></span>';
+  $("hVer").innerHTML = "";
+  $("hLoc").innerHTML = '<span class="skel" style="width:180px;height:24px;"></span>';
+  $("hSub").innerHTML = '<span class="skel" style="width:130px;height:14px;display:inline-block;margin-top:4px;"></span>';
+  $("hCoord").textContent = "";
+
+  try {
+    const res = await fetch("/api/ip");
+    if(!res.ok) throw new Error(`HTTP ${res.status}`);
+    const d = await res.json();
+
+    // Hero
+    $("hIp").textContent  = d.ip || "—";
+    $("hVer").innerHTML   = `<span class="ip-badge">${d.version || "IPv4"}</span>`;
+    const f = flag(d.country_code);
+    $("hLoc").innerHTML   = `${f ? `<span>${f}</span>` : ""}${d.city || "—"}, ${d.region || "—"}`;
+    $("hSub").textContent = `${d.country_name || "—"} · ${d.country_code_iso3 || "—"}`;
+    if(d.latitude != null && d.longitude != null)
+      $("hCoord").textContent = `${d.latitude}°, ${d.longitude}°`;
+
+    // All data-key fields
+    const keys = [
+      "asn","org","network","version","city","region","region_code","postal",
+      "latitude","longitude","country_name","country_code","country_code_iso3",
+      "country_capital","country_tld","continent_code",
+      "currency","currency_name","country_calling_code","languages",
+      "timezone","utc_offset"
+    ];
+    keys.forEach(k => fill(k, d[k]));
+
+    // Hostname (not always present)
+    fill("hostname", d.hostname || "");
+
+    // EU badge
+    const eu = $("euBadge");
+    eu.textContent = "";
+    const b = document.createElement("span");
+    b.className = `eu ${d.in_eu ? "yes" : "no"}`;
+    b.textContent = d.in_eu ? "✓ Yes" : "✗ No";
+    eu.appendChild(b);
+
+    // Stats
+    $("areaVal").textContent = d.country_area != null ? `${fmt(d.country_area)} km²` : "—";
+    $("popVal").textContent  = d.country_population != null ? fmt(d.country_population) : "—";
+
+    // Clock
+    tz = d.timezone || null;
+    if(clockId) clearInterval(clockId);
+    if(tz){ tick(); clockId = setInterval(tick, 1000); }
+
+    // JSON
+    const payload = {
+      ip: d.ip, network: d.network, version: d.version,
+      city: d.city, region: d.region, region_code: d.region_code,
+      country: d.country, country_name: d.country_name,
+      country_code: d.country_code, country_code_iso3: d.country_code_iso3,
+      country_capital: d.country_capital, country_tld: d.country_tld,
+      continent_code: d.continent_code, in_eu: d.in_eu,
+      postal: d.postal, latitude: d.latitude, longitude: d.longitude,
+      timezone: d.timezone, utc_offset: d.utc_offset,
+      country_calling_code: d.country_calling_code,
+      currency: d.currency, currency_name: d.currency_name,
+      languages: d.languages, country_area: d.country_area,
+      country_population: d.country_population, asn: d.asn, org: d.org
+    };
+    $("jPre").innerHTML = hlJson(payload);
+
+  } catch(err){
+    const bar = $("errBar");
+    bar.textContent = `⚠ Could not load data: ${err.message}`;
+    bar.style.display = "block";
+  } finally {
+    btn.disabled = false;
+    btn.classList.remove("loading");
+  }
+}
+
+load();
+</script>
+</body>
+</html>
