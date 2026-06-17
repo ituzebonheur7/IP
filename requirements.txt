@@ -1,0 +1,6 @@
+flask>=3.0.0
+maxminddb>=2.0.0
+maxminddb-geolite2>=2018.703
+dnspython>=2.4.0
+pycountry>=22.3.5
+requests>=2.28.0
