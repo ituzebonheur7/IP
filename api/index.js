@@ -1,24 +1,18 @@
 const geoip = require('geoip-lite');
-const ip6addr = require('ip6addr');
 
 module.exports = async (req, res) => {
   try {
-    // Get client IP from request
     const clientIp = req.headers['x-forwarded-for']?.split(',')[0].trim() ||
                      req.headers['x-real-ip'] ||
                      req.socket.remoteAddress ||
                      '127.0.0.1';
 
-    // Get geolocation from IP
     const geo = geoip.lookup(clientIp);
 
-    // Extract IPv6 address
     const ipv6 = getIPv6(req);
 
-    // Get ASN and organization info
     const asnInfo = getASNInfo(clientIp, geo);
 
-    // Build response matching schema
     const data = {
       ip: clientIp,
       ipv6: ipv6,
@@ -35,7 +29,6 @@ module.exports = async (req, res) => {
 };
 
 function getIPv6(req) {
-  // Try to get IPv6 from various sources
   const forwarded = req.headers['x-forwarded-for'];
   if (forwarded) {
     const ips = forwarded.split(',').map(ip => ip.trim());
@@ -71,7 +64,6 @@ function getUtcOffset(timezone) {
 }
 
 function getASNInfo(ip, geo) {
-  // Use geoip-lite's built-in ASN data if available
   if (geo && geo.asn) {
     return {
       asn: geo.asn.asn || '',
@@ -79,7 +71,6 @@ function getASNInfo(ip, geo) {
     };
   }
 
-  // Fallback: return empty if not available
   return {
     asn: '',
     org: ''
