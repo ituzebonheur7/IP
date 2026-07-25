@@ -1,4 +1,5 @@
 const geoip = require('geoip-lite');
+const ip6addr = require('ip6addr');
 
 module.exports = async (req, res) => {
   try {
@@ -11,19 +12,20 @@ module.exports = async (req, res) => {
     // Get geolocation from IP
     const geo = geoip.lookup(clientIp);
 
-    // Extract IPv6 if available
-    const ipv6 = req.socket.remoteAddress?.includes(':') ? req.socket.remoteAddress : '';
+    // Extract IPv6 address
+    const ipv6 = getIPv6(req);
+
+    // Get ASN and organization info
+    const asnInfo = getASNInfo(clientIp, geo);
 
     // Build response matching schema
     const data = {
       ip: clientIp,
-      ipv6: ipv6 || '',
-      postal: geo?.zip || '',
+      ipv6: ipv6,
       timezone: geo?.timezone || '',
       utc_offset: getUtcOffset(geo?.timezone) || '',
-      languages: geo?.country ? getLanguagesByCountry(geo.country) : '',
-      asn: geo?.asn?.asn || '',
-      org: geo?.asn?.org || ''
+      asn: asnInfo.asn,
+      org: asnInfo.org
     };
 
     res.status(200).json(data);
@@ -31,6 +33,26 @@ module.exports = async (req, res) => {
     res.status(500).json({ error: error.message });
   }
 };
+
+function getIPv6(req) {
+  // Try to get IPv6 from various sources
+  const forwarded = req.headers['x-forwarded-for'];
+  if (forwarded) {
+    const ips = forwarded.split(',').map(ip => ip.trim());
+    for (const ip of ips) {
+      if (ip.includes(':')) {
+        return ip;
+      }
+    }
+  }
+
+  const remoteAddress = req.socket.remoteAddress || '';
+  if (remoteAddress.includes(':') && remoteAddress !== '::1') {
+    return remoteAddress;
+  }
+
+  return '';
+}
 
 function getUtcOffset(timezone) {
   if (!timezone) return '';
@@ -48,13 +70,18 @@ function getUtcOffset(timezone) {
   }
 }
 
-function getLanguagesByCountry(countryCode) {
-  // Map of country codes to primary languages
-  const languageMap = {
-    'US': 'en', 'GB': 'en', 'CA': 'en', 'AU': 'en',
-    'FR': 'fr', 'DE': 'de', 'ES': 'es', 'IT': 'it',
-    'JP': 'ja', 'CN': 'zh', 'RU': 'ru', 'BR': 'pt',
-    'MX': 'es', 'IN': 'en', 'ZA': 'en', 'KR': 'ko'
+function getASNInfo(ip, geo) {
+  // Use geoip-lite's built-in ASN data if available
+  if (geo && geo.asn) {
+    return {
+      asn: geo.asn.asn || '',
+      org: geo.asn.org || ''
+    };
+  }
+
+  // Fallback: return empty if not available
+  return {
+    asn: '',
+    org: ''
   };
-  return languageMap[countryCode] || '';
 }
