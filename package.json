@@ -1,0 +1,9 @@
+{
+  "name": "ip-geolocation",
+  "version": "1.0.0",
+  "description": "IP and geolocation detection API",
+  "main": "api/index.js",
+  "dependencies": {
+    "geoip-lite": "^1.4.7"
+  }
+}
