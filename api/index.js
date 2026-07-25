@@ -1,4 +1,4 @@
-const https = require('https');
+const geoip = require('geoip-lite');
 
 module.exports = async (req, res) => {
   try {
@@ -8,19 +8,22 @@ module.exports = async (req, res) => {
                      req.socket.remoteAddress ||
                      '127.0.0.1';
 
-    // Query ipapi.co for geolocation data
-    const response = await queryIpApi(clientIp);
-    
-    // Map response to schema
+    // Get geolocation from IP
+    const geo = geoip.lookup(clientIp);
+
+    // Extract IPv6 if available
+    const ipv6 = req.socket.remoteAddress?.includes(':') ? req.socket.remoteAddress : '';
+
+    // Build response matching schema
     const data = {
-      ip: response.ip || clientIp,
-      ipv6: response.ipv6 || '',
-      postal: response.postal || '',
-      timezone: response.timezone || '',
-      utc_offset: response.utc_offset || '',
-      languages: response.languages || '',
-      asn: response.asn || '',
-      org: response.org || ''
+      ip: clientIp,
+      ipv6: ipv6 || '',
+      postal: geo?.zip || '',
+      timezone: geo?.timezone || '',
+      utc_offset: getUtcOffset(geo?.timezone) || '',
+      languages: geo?.country ? getLanguagesByCountry(geo.country) : '',
+      asn: geo?.asn?.asn || '',
+      org: geo?.asn?.org || ''
     };
 
     res.status(200).json(data);
@@ -29,20 +32,29 @@ module.exports = async (req, res) => {
   }
 };
 
-function queryIpApi(ip) {
-  return new Promise((resolve, reject) => {
-    const url = `https://ipapi.co/${ip}/json/`;
-    
-    https.get(url, (response) => {
-      let data = '';
-      response.on('data', chunk => data += chunk);
-      response.on('end', () => {
-        try {
-          resolve(JSON.parse(data));
-        } catch (e) {
-          reject(new Error('Failed to parse IP API response'));
-        }
-      });
-    }).on('error', reject);
-  });
+function getUtcOffset(timezone) {
+  if (!timezone) return '';
+  try {
+    const now = new Date();
+    const formatter = new Intl.DateTimeFormat('en-US', {
+      timeZone: timezone,
+      timeZoneName: 'longOffset'
+    });
+    const parts = formatter.formatToParts(now);
+    const offset = parts.find(p => p.type === 'timeZoneName');
+    return offset?.value || '';
+  } catch {
+    return '';
+  }
+}
+
+function getLanguagesByCountry(countryCode) {
+  // Map of country codes to primary languages
+  const languageMap = {
+    'US': 'en', 'GB': 'en', 'CA': 'en', 'AU': 'en',
+    'FR': 'fr', 'DE': 'de', 'ES': 'es', 'IT': 'it',
+    'JP': 'ja', 'CN': 'zh', 'RU': 'ru', 'BR': 'pt',
+    'MX': 'es', 'IN': 'en', 'ZA': 'en', 'KR': 'ko'
+  };
+  return languageMap[countryCode] || '';
 }
